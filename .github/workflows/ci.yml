@@ -1,4 +1,4 @@
-name: Laravel CI & Deploy
+name: Laravel CI/CD
 
 on:
   push:
@@ -19,7 +19,7 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h localhost"
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -32,12 +32,12 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: 7.4
-          extensions: mbstring, pdo, pdo_mysql, xml, ctype, tokenizer, json, bcmath
+          extensions: mbstring, pdo, pdo_mysql
 
-      - name: Prepare Laravel environment
+      - name: Prepare Laravel
         run: |
           cp .env.example .env
-          sed -i 's/DB_HOST=.*/DB_HOST=mysql/' .env
+          sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/' .env
           sed -i 's/DB_PORT=.*/DB_PORT=3306/' .env
           sed -i 's/DB_DATABASE=.*/DB_DATABASE=laravel/' .env
           sed -i 's/DB_USERNAME=.*/DB_USERNAME=root/' .env
@@ -45,6 +45,15 @@ jobs:
           composer install --no-interaction --prefer-dist
           php artisan key:generate
           php artisan config:clear
+
+      - name: Wait for MySQL
+        run: |
+          sudo apt-get install -y netcat
+          for i in {1..30}; do
+            nc -z 127.0.0.1 3306 && echo "MySQL is up!" && break
+            echo "Waiting for MySQL ($i)..."
+            sleep 2
+          done
 
       - name: Run migrations
         run: php artisan migrate --force
@@ -63,7 +72,7 @@ jobs:
         with:
           host: ${{ secrets.EC2_IP }}
           username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
+          key: ${{ secrets.EC2_KEY }}  # Ensure you also added EC2_KEY (private SSH key)
           script: |
             cd /var/www/laravelpodcast-app
             git pull origin main
