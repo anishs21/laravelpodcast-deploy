@@ -1,4 +1,4 @@
-name: Laravel CI
+name: Laravel CI/CD
 
 on:
   push:
@@ -7,18 +7,22 @@ on:
     branches: [main]
 
 jobs:
-  test-and-deploy:
+  laravel-tests:
     runs-on: ubuntu-latest
 
     services:
       mysql:
         image: mysql:5.7
         env:
-          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
           MYSQL_DATABASE: laravel
         ports:
           - 3306:3306
-        options: --health-cmd="mysqladmin ping -h 127.0.0.1" --health-interval=10s --health-timeout=5s --health-retries=5
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout code
@@ -28,24 +32,34 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: 7.4
-          extensions: pdo, pdo_mysql
+          extensions: mbstring, pdo, pdo_mysql, xml, ctype, tokenizer, json, bcmath
 
-      - name: Set environment and install dependencies
+      - name: Prepare Laravel environment
         run: |
           cp .env.example .env
+          sed -i 's/DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
           sed -i 's/DB_HOST=.*/DB_HOST=127.0.0.1/' .env
-          composer install --no-interaction
+          sed -i 's/DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/DB_DATABASE=.*/DB_DATABASE=laravel/' .env
+          sed -i 's/DB_USERNAME=.*/DB_USERNAME=root/' .env
+          sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=/' .env
+          composer install --no-interaction --prefer-dist
           php artisan key:generate
           php artisan config:clear
 
-      - name: Run migrations
+      - name: Run Laravel Migrations
         run: php artisan migrate --force
 
-      - name: Run tests
+      - name: Run Laravel Tests
         run: php artisan test
 
-      - name: Deploy to EC2
-        if: github.ref == 'refs/heads/main'
+  deploy:
+    needs: laravel-tests
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_IP }}
