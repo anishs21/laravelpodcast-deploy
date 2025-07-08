@@ -1,4 +1,4 @@
-name: Laravel CI
+name: Laravel CI & Deploy
 
 on:
   push:
@@ -34,23 +34,17 @@ jobs:
           php-version: 7.4
           extensions: mbstring, pdo, pdo_mysql, xml, ctype, tokenizer, json, bcmath
 
-      - name: Install dependencies
+      - name: Prepare Laravel environment
         run: |
           cp .env.example .env
-          composer install --no-interaction --prefer-dist
-          php artisan key:generate
           sed -i 's/DB_HOST=.*/DB_HOST=mysql/' .env
+          sed -i 's/DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/DB_DATABASE=.*/DB_DATABASE=laravel/' .env
           sed -i 's/DB_USERNAME=.*/DB_USERNAME=root/' .env
           sed -i 's/DB_PASSWORD=.*/DB_PASSWORD=root/' .env
+          composer install --no-interaction --prefer-dist
+          php artisan key:generate
           php artisan config:clear
-
-      - name: Wait for MySQL to be ready
-        run: |
-          echo "Waiting for MySQL to be ready..."
-          until mysqladmin ping -h mysql -uroot -proot --silent; do
-            echo "Waiting for DB..."
-            sleep 5
-          done
 
       - name: Run migrations
         run: php artisan migrate --force
