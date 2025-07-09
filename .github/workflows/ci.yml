@@ -50,6 +50,16 @@ jobs:
       - name: Run Laravel Migrations
         run: php artisan migrate --force
 
+      - name: Start Laravel server in background
+        run: php artisan serve --host=127.0.0.1 --port=8000 &
+      
+      - name: Wait for server to start
+        run: sleep 5
+
+      - name: Check if Laravel app is running
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000 | grep 200
+
   deploy:
     needs: laravel-tests
     runs-on: ubuntu-latest
