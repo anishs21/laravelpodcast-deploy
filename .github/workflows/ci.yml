@@ -41,19 +41,22 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             echo "Checking Docker installation..."
-            if ! command -v docker &> /dev/null
-            then
-              echo "Docker not found. Installing using Docker's official script..."
+            if ! command -v docker &> /dev/null; then
+              echo "Docker not found. Installing Docker..."
               curl -fsSL https://get.docker.com -o get-docker.sh
               sh get-docker.sh
               sudo usermod -aG docker $USER
-              echo "Docker installed successfully."
+              newgrp docker
             else
               echo "Docker is already installed."
             fi
 
+            echo "Cleaning up disk space if needed..."
+            docker system prune -af || true
+            sudo rm -rf /var/lib/docker/tmp/* || true
+
             echo "Deploying Laravel container..."
-            sudo docker pull anishaaaa21/laravel-podcast:V1
-            sudo docker stop laravel-container || true
-            sudo docker rm laravel-container || true
-            sudo docker run -d --name laravel-container -p 8000:8000 anishaaaa21/laravel-podcast:V1
+            docker pull anishaaaa21/laravel-podcast:V1
+            docker stop laravel-container || true
+            docker rm laravel-container || true
+            docker run -d --name laravel-container -p 8000:8000 anishaaaa21/laravel-podcast:V1
