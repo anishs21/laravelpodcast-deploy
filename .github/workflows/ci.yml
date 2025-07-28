@@ -43,11 +43,9 @@ jobs:
             echo "Checking Docker installation..."
             if ! command -v docker &> /dev/null
             then
-              echo "Docker not found. Installing..."
-              sudo apt-get update -y
-              sudo apt-get install -y docker.io
-              sudo systemctl start docker
-              sudo systemctl enable docker
+              echo "Docker not found. Installing using Docker's official script..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sh get-docker.sh
               sudo usermod -aG docker $USER
               echo "Docker installed successfully."
             else
