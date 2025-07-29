@@ -14,22 +14,16 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www
 
-# Copy all source code
+# Copy source code
 COPY . .
 
-# Ensure .env exists
+# Copy example env if not present
 COPY .env.example .env
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --prefer-dist
 
-# Laravel setup: cache config, route, view
-RUN php artisan config:clear \
- && php artisan config:cache \
- && php artisan route:cache \
- && php artisan view:cache
-
-# Fix permissions
+# Set permissions
 RUN chown -R www-data:www-data /var/www \
  && chmod -R 775 storage bootstrap/cache
 
@@ -55,5 +49,9 @@ RUN chown -R www-data:www-data /var/www \
 # Use non-root user
 USER www-data
 
-# Run Laravel app
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
+# Start Laravel app with Artisan, caching config on container start
+CMD php artisan config:clear && \
+    php artisan config:cache && \
+    php artisan route:cache && \
+    php artisan view:cache && \
+    php artisan serve --host=0.0.0.0 --port=8000
