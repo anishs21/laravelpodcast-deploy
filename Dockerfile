@@ -8,29 +8,41 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Composer from official Composer image
+# Copy Composer from official image
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Set working directory
 WORKDIR /var/www
 
-# Copy source code
+# Copy application files
 COPY . .
 
-# Copy example env if not present
+# Ensure essential directories exist
+RUN mkdir -p storage/logs bootstrap/cache
+
+# Copy .env if not already present
 COPY .env.example .env
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --prefer-dist
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www \
- && chmod -R 775 storage bootstrap/cache
+# Generate app key
+RUN php artisan key:generate
 
-# Final Stage (runtime only)
+# Cache config, route, and views
+RUN php artisan config:clear && \
+    php artisan config:cache && \
+   # php artisan route:cache && \
+    php artisan view:cache
+
+# Set permissions
+RUN chown -R www-data:www-data /var/www && \
+    chmod -R 775 storage bootstrap/cache
+
+# Final Runtime Stage
 FROM php:7.4-fpm-alpine
 
-# Install runtime dependencies using apk (lightweight)
+# Install runtime dependencies
 RUN apk add --no-cache \
     libzip-dev libpng-dev libjpeg-turbo-dev oniguruma-dev libxml2-dev \
     && docker-php-ext-configure gd --with-jpeg \
@@ -42,16 +54,16 @@ WORKDIR /var/www
 # Copy app from build stage
 COPY --from=build /var/www /var/www
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www \
- && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+# Ensure log/cache dirs exist in runtime
+RUN mkdir -p storage/logs bootstrap/cache && \
+    chown -R www-data:www-data storage bootstrap/cache && \
+    chmod -R 775 storage bootstrap/cache
 
-# Use non-root user
+# Set correct ownership
+RUN chown -R www-data:www-data /var/www
+
+# Run container as non-root
 USER www-data
 
-# Start Laravel app with Artisan, caching config on container start
-CMD php artisan config:clear && \
-    php artisan config:cache && \
-    php artisan route:cache && \
-    php artisan view:cache && \
-    php artisan serve --host=0.0.0.0 --port=8000
+# Start Laravel development server
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
