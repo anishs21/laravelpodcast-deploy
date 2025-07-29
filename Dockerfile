@@ -1,35 +1,43 @@
- FROM php:7.4-fpm
+# Build Stage
+FROM php:7.4-fpm AS build
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpng-dev \
-    libjpeg-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    curl \
-    git \
-    npm \
-    libzip-dev \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+# Install build dependencies (use --no-install-recommends for apt to reduce size)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    unzip curl git zip libzip-dev libpng-dev libjpeg-dev libonig-dev libxml2-dev build-essential \
+    && docker-php-ext-configure gd --with-jpeg \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www
 
-# Copy all files
+COPY composer.json composer.lock ./
+
+RUN composer install --no-dev --optimize-autoloader --prefer-dist
+
 COPY . .
 
-# Install PHP dependencies
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+# Fix permissions
+RUN chown -R www-data:www-data /var/www
 
-# Copy existing application directory permissions
-RUN chown -R www-data:www-data /var/www \
-    && chmod -R 755 /var/www
+# Final Stage
+FROM php:7.4-fpm-alpine
 
+# Install only runtime dependencies (no build-essential here)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libzip-dev libpng-dev libjpeg-dev libonig-dev libxml2-dev \
+    && docker-php-ext-configure gd --with-jpeg \
+    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /var/www
+
+COPY --from=build /var/www /var/www
+
+# Set proper permissions
+RUN chown -R www-data:www-data /var/www
+
+USER www-data
 
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]

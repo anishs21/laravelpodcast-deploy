@@ -56,7 +56,7 @@ jobs:
             sudo rm -rf /var/lib/docker/tmp/* || true
 
             echo "Deploying Laravel container..."
-            docker pull anishaaaa21/laravel-podcast:V1
-            docker stop laravel-container || true
-            docker rm laravel-container || true
-            docker run -d --name laravel-container -p 8000:8000 anishaaaa21/laravel-podcast:V1
+            sudo docker pull anishaaaa21/laravel-podcast:V1
+            sudo docker stop laravel-container || true
+            sudo docker rm laravel-container || true
+            sudo docker run -d --name laravel-container -p 8000:8000 anishaaaa21/laravel-podcast:V1
