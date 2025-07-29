@@ -14,16 +14,26 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www
 
-# Copy source code before running Composer
+# Copy all source code
 COPY . .
+
+# Ensure .env exists
+COPY .env.example .env
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --prefer-dist
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www
+# Laravel setup: cache config, route, view
+RUN php artisan config:clear \
+ && php artisan config:cache \
+ && php artisan route:cache \
+ && php artisan view:cache
 
-# Final Stage
+# Fix permissions
+RUN chown -R www-data:www-data /var/www \
+ && chmod -R 775 storage bootstrap/cache
+
+# Final Stage (runtime only)
 FROM php:7.4-fpm-alpine
 
 # Install runtime dependencies using apk (lightweight)
@@ -35,14 +45,15 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /var/www
 
-# Copy application from build stage
+# Copy app from build stage
 COPY --from=build /var/www /var/www
 
-# Set correct ownership
-RUN chown -R www-data:www-data /var/www
+# Set permissions
+RUN chown -R www-data:www-data /var/www \
+ && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
-# Run container as non-root
+# Use non-root user
 USER www-data
 
-# Start Laravel development server
+# Run Laravel app
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
