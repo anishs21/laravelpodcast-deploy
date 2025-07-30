@@ -48,6 +48,13 @@ jobs:
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
 
+            # Stop and remove any container using port 8000 (fixes port conflict)
+            PORT_IN_USE=$(docker ps --filter "publish=8000" -q)
+            if [ -n "$PORT_IN_USE" ]; then
+              docker stop $PORT_IN_USE
+              docker rm $PORT_IN_USE
+            fi
+
             # Clone or pull latest repo
             if [ -d "laravelpodcast-deploy" ]; then
               cd laravelpodcast-deploy
