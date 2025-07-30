@@ -1,10 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    volumes:
-      - .:/var/www
+    image: anishaaaa21/laravel-podcast:V1
     ports:
       - 8000:8000
     depends_on:
