@@ -24,8 +24,8 @@ jobs:
 
       - name: Build and Push Docker Image
         run: |
-          docker build -t anishaaaa21/laravel-podcast:V1 .
-          docker push anishaaaa21/laravel-podcast:V1
+          docker build -t anishaaaa21/laravel-podcast:latest .
+          docker push anishaaaa21/laravel-podcast:latest
 
   deploy:
     name: Deploy to EC2 using Docker Compose
@@ -40,12 +40,16 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            # Update and install Docker and Docker Compose
+            # Install Git, Docker, and Docker Compose if not available
+            sudo apt update && sudo apt install -y git
+
             if ! command -v docker &> /dev/null; then
               curl -fsSL https://get.docker.com -o get-docker.sh
               sh get-docker.sh
             fi
-            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+            DOCKER_COMPOSE_VERSION=2.24.2
+            sudo curl -L "https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
 
             # Stop and remove any container using port 8000 (fixes port conflict)
@@ -58,13 +62,14 @@ jobs:
             # Clone or pull latest repo
             if [ -d "laravelpodcast-deploy" ]; then
               cd laravelpodcast-deploy
-              git pull
+              git reset --hard
+              git pull origin main
             else
               git clone https://github.com/anishs21/laravelpodcast-deploy.git
               cd laravelpodcast-deploy
             fi
 
-            # Run Docker Compose
+            # Use latest Docker image from Docker Hub
             docker compose down || true
             docker compose pull
-            docker compose up -d --build
+            docker compose up -d
